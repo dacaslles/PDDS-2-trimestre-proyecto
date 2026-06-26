@@ -1,0 +1,52 @@
+name: Frontend Code Analysis
+
+# Se ejecuta en cada pull request que modifica archivos dentro de la carpeta 'app/'
+# o este mismo workflow.
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - '.github/workflows/frontend-analysis.yml'
+
+permissions:
+  contents: read # Requerido para hacer checkout del código.
+
+jobs:
+  sonar-analysis:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+
+    # Con 'continue-on-error: true', si el análisis falla por alguna razón
+    # (ej. SonarCloud no disponible), el job no marcará el PR con una 'X' roja,
+    # evitando confusiones. La configuración principal para que no sea bloqueante
+    # está en las reglas de protección de la rama (ver Ajuste 4).
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        # SonarQube necesita el historial completo para analizar correctamente
+        # el origen de los issues y asignarlos a la persona correcta.
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+        with:
+          # Indicamos que el proyecto a analizar está en la carpeta 'app'
+          projectBaseDir: app
